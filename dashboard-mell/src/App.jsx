@@ -34,7 +34,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from 'recharts';
-import { GENERAL_STATS } from './data.js';
+import { GENERAL_STATS, CAMPAIGN_END, HOLIDAYS } from './data.js';
 import Cities from './Cities.jsx';
 import {
   TOTAL_BUSINESS_DAYS,
@@ -493,7 +493,7 @@ export default function App() {
               </div>
 
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <p className="text-xs font-semibold text-slate-400 uppercase">Projeção de Fechamento (05/12)</p>
+                <p className="text-xs font-semibold text-slate-400 uppercase">Projeção de Fechamento ({CAMPAIGN_END.slice(8, 10)}/{CAMPAIGN_END.slice(5, 7)})</p>
                 <div className="mt-2 flex items-baseline space-x-2">
                   <span className={`text-3xl font-extrabold ${baseOk ? 'text-emerald-400' : 'text-red-400'}`}>{BASE.grossTotal}</span>
                   <span className="text-xs text-slate-400">vendas novas esperadas</span>
@@ -512,7 +512,7 @@ export default function App() {
                     Trajetória Acumulada: Realizado vs Projeção vs Meta {goal}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    {TOTAL_BUSINESS_DAYS} dias úteis (seg-sáb; exclui feriados 02/11, 15/11 e 20/11). * Corte em 04/11 às 12h.
+                    {TOTAL_BUSINESS_DAYS} dias úteis (seg-sáb; exclui feriados {HOLIDAYS.map((h) => `${h.slice(8, 10)}/${h.slice(5, 7)}`).join(', ')}). * Corte em {GENERAL_STATS.cutoffLabel}.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-xs">
@@ -554,7 +554,7 @@ export default function App() {
                       stroke="#94a3b8"
                       fontSize={11}
                     />
-                    <YAxis stroke="#94a3b8" fontSize={11} domain={[0, 900]} />
+                    <YAxis stroke="#94a3b8" fontSize={11} domain={[0, (max) => Math.max(900, Math.ceil(max / 100) * 100)]} />
                     <Tooltip
                       contentStyle={tooltipStyle}
                       labelFormatter={(x) => `${TICK_LABEL[x] ?? ''} — dia útil ${formatNum(x, 1)}`}
@@ -604,10 +604,10 @@ export default function App() {
                   {signed(SPLIT_PROJECTION.diff)})
                 </h4>
                 <p className="text-slate-400">
-                  O export mostra {formatNum(WEEKDAY_PACE, 1)} vendas novas/dia de seg a sex e {formatNum(SATURDAY_PACE, 0)} no sábado
-                  (31/10). Restam {formatNum(REMAINING_SPLIT.weekdays, 1)} dias de seg-sex e {REMAINING_SPLIT.saturdays} sábados.
+                  O export mostra {formatNum(WEEKDAY_PACE, 1)} vendas novas/dia de seg a sex e {formatNum(SATURDAY_PACE, 1)} por sábado
+                  ({SATURDAYS_OBSERVED} sábado{SATURDAYS_OBSERVED === 1 ? '' : 's'} observado{SATURDAYS_OBSERVED === 1 ? '' : 's'}). Restam {formatNum(REMAINING_SPLIT.weekdays, 1)} dias de seg-sex e {REMAINING_SPLIT.saturdays} sábados.
                   Aplicando cada ritmo ao seu dia (ajustado para {GENERAL_STATS.currentConsultants} consultores), a projeção fica
-                  em {SPLIT_PROJECTION.total}. Cautela: só {SATURDAYS_OBSERVED} sábado observado.
+                  em {SPLIT_PROJECTION.total}.{SATURDAYS_OBSERVED < 3 ? ' Cautela: poucos sábados observados.' : ''}
                 </p>
               </div>
             </div>
@@ -902,7 +902,7 @@ export default function App() {
 
       <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-6 border-t border-slate-800 text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-2">
         <p>Mell Internet BI & Revenue Operations © 2026. Todos os direitos reservados.</p>
-        <p>Fonte dos dados: Hubsoft export - Relatório de Serviços ({GENERAL_STATS.period}).</p>
+        <p>Fonte: Hubsoft, Relatório de Serviços ({GENERAL_STATS.period}). Atualizado em {GENERAL_STATS.generatedAt.slice(8, 10)}/{GENERAL_STATS.generatedAt.slice(5, 7)} {GENERAL_STATS.generatedAt.slice(11, 16)}.</p>
       </footer>
     </div>
   );

@@ -34,7 +34,8 @@ export const label = (date) => {
 };
 
 export const TOTAL_BUSINESS_DAYS = businessDaysThrough(CAMPAIGN_END);
-export const DAYS_ELAPSED = businessDaysThrough(CUTOFF_DATE) - 1 + CUTOFF_FRACTION;
+const CUTOFF_IS_BUSINESS = isBusinessDay(parse(CUTOFF_DATE));
+export const DAYS_ELAPSED = businessDaysThrough(CUTOFF_DATE) - (CUTOFF_IS_BUSINESS ? 1 - CUTOFF_FRACTION : 0);
 export const REMAINING_DAYS = TOTAL_BUSINESS_DAYS - DAYS_ELAPSED;
 
 // Produtividade realizada (calculada sobre os 39 consultores do período).
@@ -79,15 +80,21 @@ export { DAILY_ACTUALS };
 
 // Projeção que separa seg-sex de sábado (sábado vende bem menos).
 const isSaturday = (date) => parse(date).getDay() === 6;
-const fullDays = DAILY_ACTUALS.filter((p) => p.date !== CUTOFF_DATE);
+// Dias completos: exclui o dia de corte, a menos que o export seja do fim do expediente.
+const fullDays = DAILY_ACTUALS.filter((p) => p.date !== CUTOFF_DATE || CUTOFF_FRACTION >= 1);
 const avg = (xs) => xs.reduce((s, x) => s + x, 0) / (xs.length || 1);
 export const WEEKDAY_PACE = avg(fullDays.filter((p) => !isSaturday(p.date)).map((p) => p.qtd));
-export const SATURDAY_PACE = avg(fullDays.filter((p) => isSaturday(p.date)).map((p) => p.qtd));
 export const SATURDAYS_OBSERVED = fullDays.filter((p) => isSaturday(p.date)).length;
+// Sem sábado observado, não há base para separar: usa o ritmo de seg-sex.
+export const SATURDAY_PACE = SATURDAYS_OBSERVED
+  ? avg(fullDays.filter((p) => isSaturday(p.date)).map((p) => p.qtd))
+  : WEEKDAY_PACE;
 
 function remainingSplit() {
-  let weekdays = 1 - CUTOFF_FRACTION; // resto do dia de corte
-  let saturdays = 0;
+  // resto do dia de corte
+  const rest = CUTOFF_IS_BUSINESS ? 1 - CUTOFF_FRACTION : 0;
+  let weekdays = isSaturday(CUTOFF_DATE) ? 0 : rest;
+  let saturdays = isSaturday(CUTOFF_DATE) ? rest : 0;
   const d = parse(CUTOFF_DATE);
   for (d.setDate(d.getDate() + 1); d <= parse(CAMPAIGN_END); d.setDate(d.getDate() + 1)) {
     if (!isBusinessDay(d)) continue;
@@ -160,13 +167,15 @@ export const FIN = (() => {
   };
 })();
 
+const ZERO = { count: 0, percentage: 0 };
+const byName = (rows, name) => rows.find((s) => s.name === name) ?? ZERO;
 export const STATUS = {
-  cancelados: SERVICE_STATUS.find((s) => s.name === 'Cancelado'),
-  aguardInstal: SERVICE_STATUS.find((s) => s.name === 'Aguardando Instalação'),
-  aguardMig: SERVICE_STATUS.find((s) => s.name === 'Aguardando Migração'),
-  naoAceito: CONTRACT_ROWS.find((s) => s.name === 'Não Aceito'),
-  aceito: CONTRACT_ROWS.find((s) => s.name === 'Aceito'),
-  semContrato: CONTRACT_ROWS.find((s) => s.name.startsWith('Sem Contrato')),
+  cancelados: byName(SERVICE_STATUS, 'Cancelado'),
+  aguardInstal: byName(SERVICE_STATUS, 'Aguardando Instalação'),
+  aguardMig: byName(SERVICE_STATUS, 'Aguardando Migração'),
+  naoAceito: byName(CONTRACT_ROWS, 'Não Aceito'),
+  aceito: byName(CONTRACT_ROWS, 'Aceito'),
+  semContrato: CONTRACT_ROWS.find((s) => s.name.startsWith('Sem Contrato')) ?? { count: 0, percentage: 0 },
 };
 
 // --- Cidades ---

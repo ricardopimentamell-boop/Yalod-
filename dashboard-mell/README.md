@@ -8,15 +8,17 @@ Campanha 26/10 a 05/12/2026. Base: export Hubsoft (26/10 a 04/11/2026, 12h).
 ## Atualizar com um novo export
 
 ```
-python3 scripts/build_data.py relatorio-de-servicos.xlsx   # gera src/export.json (só agregados)
-npm run build
+scripts/update.sh relatorio-de-servicos-do-clien-AAAAMMDDHHMMSS.xlsx
 ```
 
-Não versione o .xlsx: ele tem CPF, telefone e endereço dos clientes.
+Gera `src/export.json` (só agregados) e `dist/index.html`. A data/hora de corte sai do
+carimbo no nome do arquivo. O script para com erro se o export vier sem as colunas
+esperadas ou com totais que não fecham. Não versione o .xlsx: ele tem CPF, telefone e
+endereço dos clientes.
 
 ## Onde mexer
 
-- `src/data.js` — números de entrada, calendário, feriados.
+- `src/data.js` — parâmetros manuais (meta, consultores, horário comercial, calendário, feriados). O resto vem do export.
 - `src/metrics.js` — tudo que é derivado: dias úteis, ritmo, projeção, folga, percentuais.
 - `src/App.jsx` — layout.
 

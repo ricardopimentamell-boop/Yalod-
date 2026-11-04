@@ -1,6 +1,55 @@
 {
- "fonte": "rel.xlsx",
+ "fonte": "relatorio-de-servicos-do-clien-20261104120724-1-1.xlsx",
+ "gerado_em": "2026-11-04T17:42:08",
+ "corte": "2026-11-04T12:07",
  "registros": 948,
+ "totais": {
+  "geral": {
+   "qtd": 948,
+   "receita": 85836.33,
+   "receita_sem_sva": 83976.54
+  },
+  "novo": {
+   "qtd": 192,
+   "receita": 16747.59,
+   "receita_sem_sva": 16471.8
+  },
+  "migrado": {
+   "qtd": 756,
+   "receita": 69088.74,
+   "receita_sem_sva": 67504.74
+  }
+ },
+ "faixas_migracao": [
+  {
+   "range": "R$ 79,90 (Combo 300M)",
+   "count": 427
+  },
+  {
+   "range": "R$ 99,90 (600M)",
+   "count": 127
+  },
+  {
+   "range": "R$ 109,90 - 124,90 (Giga)",
+   "count": 110
+  },
+  {
+   "range": "Outros / Customizados",
+   "count": 92
+  }
+ ],
+ "status_servico": {
+  "Serviço Habilitado": 717,
+  "Aguardando Migração": 96,
+  "Cancelado": 70,
+  "Aguardando Instalação": 63,
+  "Suspenso Parcialmente": 2
+ },
+ "status_contrato": {
+  "Aceito": 676,
+  "Não Aceito": 184,
+  "Sem Contrato": 88
+ },
  "por_cidade_origem": [
   {
    "cidade": "CAMPO AZUL",
@@ -764,12 +813,5 @@
    "date": "2026-11-04",
    "qtd": 10
   }
- ],
- "status_servico": {
-  "Serviço Habilitado": 717,
-  "Aguardando Migração": 96,
-  "Cancelado": 70,
-  "Aguardando Instalação": 63,
-  "Suspenso Parcialmente": 2
- }
+ ]
 }
