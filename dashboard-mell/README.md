@@ -16,7 +16,7 @@ Não versione o .xlsx: ele tem CPF, telefone e endereço dos clientes.
 
 ## Onde mexer
 
-- `src/data.js` — números de entrada, calendário, feriados e o mapa **cidade → regional** (só a Regional Salinas está preenchida).
+- `src/data.js` — números de entrada, calendário, feriados.
 - `src/metrics.js` — tudo que é derivado: dias úteis, ritmo, projeção, folga, percentuais.
 - `src/App.jsx` — layout.
 

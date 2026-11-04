@@ -7,8 +7,6 @@ import {
   CUTOFF_FRACTION,
   DAILY_NEW_SALES,
   EXPORT,
-  REGIONAL_BY_CITY,
-  UNMAPPED_REGIONAL,
   PROJECTION_CHECKPOINTS,
   SERVICE_STATUS,
   CONTRACT_STATUS,
@@ -171,8 +169,7 @@ export const STATUS = {
   semContrato: CONTRACT_ROWS.find((s) => s.name.startsWith('Sem Contrato')),
 };
 
-// --- Cidades e regionais ---
-const regionalOf = (cidade) => REGIONAL_BY_CITY[cidade] ?? UNMAPPED_REGIONAL;
+// --- Cidades ---
 const FLAGS = ['cancelado', 'aguard_inst', 'aguard_mig', 'habilitado', 'aceito', 'nao_aceito', 'sem_contrato'];
 
 function emptyGeo(key) {
@@ -204,8 +201,6 @@ function groupGeo(keyFn) {
       const nf = (f) => g.novoFlags[f] ?? 0;
       return {
         key: g.key,
-        regional: regionalOf([...g.cidades][0]),
-        nCidades: g.cidades.size,
         novo: g.novo,
         migrado: g.migrado,
         total,
@@ -225,8 +220,6 @@ function groupGeo(keyFn) {
 }
 
 export const CITY_ROWS = groupGeo((c) => c);
-export const REGIONAL_ROWS = groupGeo(regionalOf);
-export const UNMAPPED_CITIES = CITY_ROWS.filter((c) => c.regional === UNMAPPED_REGIONAL).length;
 
 // Risco específico das vendas novas (não da base toda).
 export const NEW_SALES_RISK = (() => {

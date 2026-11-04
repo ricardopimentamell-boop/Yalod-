@@ -2,16 +2,6 @@ import EXPORT from './export.json';
 
 export { EXPORT };
 
-// Cidade -> regional. Regional Salinas confirmada pelo DRE Consolidado.
-// Cidades fora do mapa aparecem como "A classificar" — complete aqui.
-export const REGIONAL_BY_CITY = {
-  SALINAS: 'Salinas',
-  TAIOBEIRAS: 'Salinas',
-  'RIO PARDO DE MINAS': 'Salinas',
-  NOVORIZONTE: 'Salinas',
-};
-export const UNMAPPED_REGIONAL = 'A classificar';
-
 // Dados de entrada (export Hubsoft — Relatório de Serviços, 26/10 a 04/11/2026 12h).
 // Tudo que é projeção/percentual é calculado em metrics.js a partir daqui.
 

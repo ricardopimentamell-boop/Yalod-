@@ -35,7 +35,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { GENERAL_STATS } from './data.js';
-import Regions from './Regions.jsx';
+import Cities from './Cities.jsx';
 import {
   TOTAL_BUSINESS_DAYS,
   DAYS_ELAPSED,
@@ -136,7 +136,7 @@ export default function App() {
           {[
             { id: 'overview', label: 'Visão Geral', icon: BarChart2 },
             { id: 'projection', label: `Projeção & Meta ${goal}`, icon: Target },
-            { id: 'regions', label: 'Cidades & Regionais', icon: MapPin },
+            { id: 'cities', label: 'Cidades', icon: MapPin },
             { id: 'funnel', label: 'Funil & Riscos (Aceite)', icon: ShieldAlert },
             { id: 'simulator', label: 'Simulador Executivo', icon: Sliders },
           ].map((tab) => {
@@ -614,7 +614,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'regions' && <Regions />}
+        {activeTab === 'cities' && <Cities />}
 
         {/* TAB 3 - FUNNEL */}
         {activeTab === 'funnel' && (
