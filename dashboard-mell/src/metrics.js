@@ -5,7 +5,10 @@ import {
   HOLIDAYS,
   CUTOFF_DATE,
   CUTOFF_FRACTION,
-  DAILY_ACTUALS,
+  DAILY_NEW_SALES,
+  EXPORT,
+  REGIONAL_BY_CITY,
+  UNMAPPED_REGIONAL,
   PROJECTION_CHECKPOINTS,
   SERVICE_STATUS,
   CONTRACT_STATUS,
@@ -69,6 +72,41 @@ export const DEFAULT_SCENARIO = {
 export const BASE = project({ ...DEFAULT_SCENARIO, lossPct: 0 });
 export const RISK = project(DEFAULT_SCENARIO);
 
+// Acumulado diário real de vendas novas.
+const DAILY_ACTUALS = DAILY_NEW_SALES.reduce((acc, p) => {
+  const prev = acc.length ? acc[acc.length - 1].acumulado : 0;
+  return [...acc, { date: p.date, qtd: p.qtd, acumulado: prev + p.qtd }];
+}, []);
+export { DAILY_ACTUALS };
+
+// Projeção que separa seg-sex de sábado (sábado vende bem menos).
+const isSaturday = (date) => parse(date).getDay() === 6;
+const fullDays = DAILY_ACTUALS.filter((p) => p.date !== CUTOFF_DATE);
+const avg = (xs) => xs.reduce((s, x) => s + x, 0) / (xs.length || 1);
+export const WEEKDAY_PACE = avg(fullDays.filter((p) => !isSaturday(p.date)).map((p) => p.qtd));
+export const SATURDAY_PACE = avg(fullDays.filter((p) => isSaturday(p.date)).map((p) => p.qtd));
+export const SATURDAYS_OBSERVED = fullDays.filter((p) => isSaturday(p.date)).length;
+
+function remainingSplit() {
+  let weekdays = 1 - CUTOFF_FRACTION; // resto do dia de corte
+  let saturdays = 0;
+  const d = parse(CUTOFF_DATE);
+  for (d.setDate(d.getDate() + 1); d <= parse(CAMPAIGN_END); d.setDate(d.getDate() + 1)) {
+    if (!isBusinessDay(d)) continue;
+    if (d.getDay() === 6) saturdays += 1;
+    else weekdays += 1;
+  }
+  return { weekdays, saturdays };
+}
+export const REMAINING_SPLIT = remainingSplit();
+
+export const SPLIT_PROJECTION = (() => {
+  const scale = G.currentConsultants / G.initialConsultants;
+  const future = (REMAINING_SPLIT.weekdays * WEEKDAY_PACE + REMAINING_SPLIT.saturdays * SATURDAY_PACE) * scale;
+  const total = Math.round(G.newSalesCount + future);
+  return { total, diff: total - G.targetGoal, rate: (total / G.targetGoal) * 100 };
+})();
+
 // Trajetória: realizado + projeção linear (ritmo atual, 38 consultores) + meta linear.
 const linearGoal = (days) => Math.round((G.targetGoal / TOTAL_BUSINESS_DAYS) * days);
 const projDaily = G.currentConsultants * PACE_PER_CONSULTANT;
@@ -103,13 +141,7 @@ const withPct = (rows, total) => rows.map((r) => ({ ...r, percentage: pct(r.coun
 export const MIGRATION_ROWS = withPct(MIGRATION_PRICES, G.migrationsCount);
 export const CONTRACT_ROWS = withPct(CONTRACT_STATUS, G.totalTransactions);
 
-// O export soma 946 nos 4 status; a diferença aparece como linha própria.
-const statusSum = SERVICE_STATUS.reduce((s, r) => s + r.count, 0);
-const statusGap = G.totalTransactions - statusSum;
-export const SERVICE_ROWS = withPct(
-  statusGap > 0 ? [...SERVICE_STATUS, { name: 'Sem status / outros', count: statusGap, fill: '#64748b' }] : SERVICE_STATUS,
-  G.totalTransactions,
-);
+export const SERVICE_ROWS = withPct(SERVICE_STATUS, G.totalTransactions);
 
 export const FIN = (() => {
   const newTicket = G.newSalesRevenue / G.newSalesCount;
@@ -138,3 +170,69 @@ export const STATUS = {
   aceito: CONTRACT_ROWS.find((s) => s.name === 'Aceito'),
   semContrato: CONTRACT_ROWS.find((s) => s.name.startsWith('Sem Contrato')),
 };
+
+// --- Cidades e regionais ---
+const regionalOf = (cidade) => REGIONAL_BY_CITY[cidade] ?? UNMAPPED_REGIONAL;
+const FLAGS = ['cancelado', 'aguard_inst', 'aguard_mig', 'habilitado', 'aceito', 'nao_aceito', 'sem_contrato'];
+
+function emptyGeo(key) {
+  return { key, cidades: new Set(), novo: 0, migrado: 0, receitaNovo: 0, receitaMig: 0, novoFlags: {}, allFlags: {} };
+}
+
+function groupGeo(keyFn) {
+  const map = new Map();
+  for (const r of EXPORT.por_cidade_origem) {
+    const k = keyFn(r.cidade);
+    if (!map.has(k)) map.set(k, emptyGeo(k));
+    const g = map.get(k);
+    g.cidades.add(r.cidade);
+    if (r.origem === 'novo') {
+      g.novo += r.qtd;
+      g.receitaNovo += r.receita;
+    } else {
+      g.migrado += r.qtd;
+      g.receitaMig += r.receita;
+    }
+    for (const f of FLAGS) {
+      g.allFlags[f] = (g.allFlags[f] ?? 0) + r[f];
+      if (r.origem === 'novo') g.novoFlags[f] = (g.novoFlags[f] ?? 0) + r[f];
+    }
+  }
+  return [...map.values()]
+    .map((g) => {
+      const total = g.novo + g.migrado;
+      const nf = (f) => g.novoFlags[f] ?? 0;
+      return {
+        key: g.key,
+        regional: regionalOf([...g.cidades][0]),
+        nCidades: g.cidades.size,
+        novo: g.novo,
+        migrado: g.migrado,
+        total,
+        receita: g.receitaNovo + g.receitaMig,
+        ticketNovo: g.novo ? g.receitaNovo / g.novo : null,
+        shareMeta: (g.novo / G.targetGoal) * 100,
+        shareNovo: (g.novo / G.newSalesCount) * 100,
+        novoCancelado: nf('cancelado'),
+        novoAguardInst: nf('aguard_inst'),
+        novoNaoAceito: nf('nao_aceito'),
+        novoRisco: g.novo ? ((nf('cancelado') + nf('nao_aceito')) / g.novo) * 100 : null,
+        cancelPct: total ? ((g.allFlags.cancelado ?? 0) / total) * 100 : 0,
+        naoAceitoPct: total ? ((g.allFlags.nao_aceito ?? 0) / total) * 100 : 0,
+      };
+    })
+    .sort((a, b) => b.novo - a.novo || b.total - a.total);
+}
+
+export const CITY_ROWS = groupGeo((c) => c);
+export const REGIONAL_ROWS = groupGeo(regionalOf);
+export const UNMAPPED_CITIES = CITY_ROWS.filter((c) => c.regional === UNMAPPED_REGIONAL).length;
+
+// Risco específico das vendas novas (não da base toda).
+export const NEW_SALES_RISK = (() => {
+  const t = CITY_ROWS.reduce(
+    (s, c) => ({ canc: s.canc + c.novoCancelado, nao: s.nao + c.novoNaoAceito, inst: s.inst + c.novoAguardInst }),
+    { canc: 0, nao: 0, inst: 0 },
+  );
+  return { ...t, cancPct: (t.canc / G.newSalesCount) * 100, naoPct: (t.nao / G.newSalesCount) * 100 };
+})();

@@ -16,6 +16,7 @@ import {
   Layers,
   ShieldAlert,
   RotateCcw,
+  MapPin,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -34,6 +35,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { GENERAL_STATS } from './data.js';
+import Regions from './Regions.jsx';
 import {
   TOTAL_BUSINESS_DAYS,
   DAYS_ELAPSED,
@@ -50,6 +52,12 @@ import {
   FIN,
   STATUS,
   project,
+  WEEKDAY_PACE,
+  SATURDAY_PACE,
+  SATURDAYS_OBSERVED,
+  REMAINING_SPLIT,
+  SPLIT_PROJECTION,
+  NEW_SALES_RISK,
 } from './metrics.js';
 
 const formatBRL = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
@@ -128,6 +136,7 @@ export default function App() {
           {[
             { id: 'overview', label: 'Visão Geral', icon: BarChart2 },
             { id: 'projection', label: `Projeção & Meta ${goal}`, icon: Target },
+            { id: 'regions', label: 'Cidades & Regionais', icon: MapPin },
             { id: 'funnel', label: 'Funil & Riscos (Aceite)', icon: ShieldAlert },
             { id: 'simulator', label: 'Simulador Executivo', icon: Sliders },
           ].map((tab) => {
@@ -588,9 +597,24 @@ export default function App() {
                   </p>
                 </div>
               </div>
+
+              <div className="mt-4 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20 text-xs text-slate-300">
+                <h4 className="font-semibold text-amber-300 mb-1">
+                  Cenário C: ritmo real seg-sex vs. sábado → {SPLIT_PROJECTION.total} vendas ({formatPct(SPLIT_PROJECTION.rate)},{' '}
+                  {signed(SPLIT_PROJECTION.diff)})
+                </h4>
+                <p className="text-slate-400">
+                  O export mostra {formatNum(WEEKDAY_PACE, 1)} vendas novas/dia de seg a sex e {formatNum(SATURDAY_PACE, 0)} no sábado
+                  (31/10). Restam {formatNum(REMAINING_SPLIT.weekdays, 1)} dias de seg-sex e {REMAINING_SPLIT.saturdays} sábados.
+                  Aplicando cada ritmo ao seu dia (ajustado para {GENERAL_STATS.currentConsultants} consultores), a projeção fica
+                  em {SPLIT_PROJECTION.total}. Cautela: só {SATURDAYS_OBSERVED} sábado observado.
+                </p>
+              </div>
             </div>
           </div>
         )}
+
+        {activeTab === 'regions' && <Regions />}
 
         {/* TAB 3 - FUNNEL */}
         {activeTab === 'funnel' && (
@@ -626,7 +650,9 @@ export default function App() {
                       {STATUS.cancelados.count} Contratos Cancelados (
                       {formatPct((STATUS.cancelados.count / GENERAL_STATS.totalTransactions) * 100, 2)}):
                     </strong>{' '}
-                    Perda de receita e de tempo operacional da equipe. O export não separa quantos são vendas novas vs. migrações.
+                    Perda de receita e de tempo operacional da equipe. Destes, {NEW_SALES_RISK.canc} são vendas novas (
+                    {formatPct(NEW_SALES_RISK.cancPct)} das {GENERAL_STATS.newSalesCount}); {NEW_SALES_RISK.nao} vendas novas estão
+                    com contrato não aceito ({formatPct(NEW_SALES_RISK.naoPct)}).
                   </span>
                 </div>
               </div>

@@ -1,3 +1,17 @@
+import EXPORT from './export.json';
+
+export { EXPORT };
+
+// Cidade -> regional. Regional Salinas confirmada pelo DRE Consolidado.
+// Cidades fora do mapa aparecem como "A classificar" — complete aqui.
+export const REGIONAL_BY_CITY = {
+  SALINAS: 'Salinas',
+  TAIOBEIRAS: 'Salinas',
+  'RIO PARDO DE MINAS': 'Salinas',
+  NOVORIZONTE: 'Salinas',
+};
+export const UNMAPPED_REGIONAL = 'A classificar';
+
 // Dados de entrada (export Hubsoft — Relatório de Serviços, 26/10 a 04/11/2026 12h).
 // Tudo que é projeção/percentual é calculado em metrics.js a partir daqui.
 
@@ -28,17 +42,8 @@ export const HOLIDAYS = ['2026-11-02', '2026-11-15', '2026-11-20'];
 export const CUTOFF_DATE = '2026-11-04';
 export const CUTOFF_FRACTION = 0.5;
 
-// Acumulado de vendas novas por dia útil (como informado).
-export const DAILY_ACTUALS = [
-  { date: '2026-10-26', acumulado: 25 },
-  { date: '2026-10-27', acumulado: 51 },
-  { date: '2026-10-28', acumulado: 78 },
-  { date: '2026-10-29', acumulado: 103 },
-  { date: '2026-10-30', acumulado: 129 },
-  { date: '2026-10-31', acumulado: 154 },
-  { date: '2026-11-03', acumulado: 179 },
-  { date: '2026-11-04', acumulado: 192 },
-];
+// Vendas novas por dia (data de cadastro), vindas do export via scripts/build_data.py.
+export const DAILY_NEW_SALES = EXPORT.vendas_novas_por_dia;
 
 // Pontos futuros exibidos no gráfico.
 export const PROJECTION_CHECKPOINTS = ['2026-11-10', '2026-11-17', '2026-11-24', '2026-12-01', '2026-12-05'];
@@ -55,6 +60,7 @@ export const SERVICE_STATUS = [
   { name: 'Aguardando Migração', count: 96, fill: '#3b82f6' },
   { name: 'Cancelado', count: 70, fill: '#ef4444' },
   { name: 'Aguardando Instalação', count: 63, fill: '#f59e0b' },
+  { name: 'Suspenso Parcialmente', count: 2, fill: '#64748b' },
 ];
 
 export const CONTRACT_STATUS = [
