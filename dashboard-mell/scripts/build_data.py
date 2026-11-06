@@ -17,6 +17,7 @@ import pandas as pd
 
 OUT = Path(__file__).resolve().parent.parent / "src" / "export.json"
 CAMPAIGN_START = "2026-10-26"
+START_TOLERANCE = "2026-10-27"  # primeiro cadastro deve cair até aqui
 REQUIRED = ["origem", "valor", "valor_com_pacote", "servico_status", "situacao_contrato", "cidade", "data_cadastro"]
 
 # Faixas de preço das migrações (valor com pacote).
@@ -85,6 +86,12 @@ def main(path):
     mig = d[d.origem == "migrado"].valor_c
     buckets = [{"range": name, "count": int(mig.map(test).sum())} for name, test in PRICE_BUCKETS]
     buckets.append({"range": "Outros / Customizados", "count": len(mig) - sum(b["count"] for b in buckets)})
+
+    # O export precisa cobrir a campanha inteira (filtro de data do Hubsoft desde o início).
+    first_day = d.loc[d.dia >= "2000-01-01", "dia"].min()
+    if first_day is None or first_day > START_TOLERANCE:
+        fail(f"export começa em {first_day}, mas a campanha começa em {CAMPAIGN_START}. "
+             "Exporte de novo com o período desde o início da campanha.")
 
     cutoff_day = cutoff.strftime("%Y-%m-%d")
     novo = d[(d.origem == "novo") & d.dia.between(CAMPAIGN_START, cutoff_day)]
