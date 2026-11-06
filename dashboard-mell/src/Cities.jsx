@@ -2,12 +2,13 @@ import React from 'react';
 import { MapPin } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { GENERAL_STATS } from './data.js';
-import { CITY_ROWS, NEW_SALES_RISK } from './metrics.js';
+import { CITY_ROWS, NEW_SALES_RISK, MRR_TOTAL } from './metrics.js';
 
 const fmt = (v, d = 0) =>
   v == null ? '—' : new Intl.NumberFormat('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
 const brl = (v) => (v == null ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v));
 const pct = (v, d = 1) => (v == null ? '—' : `${fmt(v, d)}%`);
+const sum = (rows, k) => rows.reduce((s, r) => s + (r[k] ?? 0), 0);
 const tooltipStyle = { backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#fff' };
 
 // Risco das vendas novas da cidade = (canceladas + sem aceite) / vendas novas.
@@ -32,6 +33,8 @@ function CityTable({ rows }) {
             <th className="py-3 px-3 text-right">Ticket novas</th>
             <th className="py-3 px-3 text-right">Novas aguard. instal.</th>
             <th className="py-3 px-3 text-right">Novas em risco*</th>
+            <th className="py-3 px-3 text-right">MRR**</th>
+            <th className="py-3 px-3 text-right">% MRR</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800">
@@ -47,9 +50,25 @@ function CityTable({ rows }) {
               <td className={`py-2.5 px-3 text-right whitespace-nowrap ${riskClass(r.novoRisco, r.novo)}`}>
                 {r.novo ? `${r.novoCancelado + r.novoNaoAceito} (${pct(r.novoRisco, 0)})` : '—'}
               </td>
+              <td className="py-2.5 px-3 text-right font-semibold text-sky-300 whitespace-nowrap">{brl(r.mrr)}</td>
+              <td className="py-2.5 px-3 text-right text-slate-400">{pct((r.mrr / MRR_TOTAL) * 100)}</td>
             </tr>
           ))}
         </tbody>
+        <tfoot>
+          <tr className="bg-slate-950 font-bold text-white border-t border-slate-700">
+            <td className="py-3 px-3 text-indigo-300">TOTAL</td>
+            <td className="py-3 px-3 text-right text-emerald-400">{sum(rows, 'novo')}</td>
+            <td className="py-3 px-3 text-right">{pct((sum(rows, 'novo') / GENERAL_STATS.targetGoal) * 100)}</td>
+            <td className="py-3 px-3 text-right text-violet-300">{sum(rows, 'migrado')}</td>
+            <td className="py-3 px-3 text-right whitespace-nowrap">{brl(sum(rows, 'receita'))}</td>
+            <td className="py-3 px-3 text-right">{brl(GENERAL_STATS.newSalesRevenue / GENERAL_STATS.newSalesCount)}</td>
+            <td className="py-3 px-3 text-right">{sum(rows, 'novoAguardInst')}</td>
+            <td className="py-3 px-3 text-right text-amber-300">{sum(rows, 'novoCancelado') + sum(rows, 'novoNaoAceito')}</td>
+            <td className="py-3 px-3 text-right text-sky-300 whitespace-nowrap">{brl(MRR_TOTAL)}</td>
+            <td className="py-3 px-3 text-right">100,0%</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
@@ -123,6 +142,10 @@ export default function Cities() {
 
         <div className="mt-4 space-y-1.5 text-[11px] text-slate-400">
           <p>* Em risco = vendas novas canceladas + com contrato não aceito. Cor só a partir de 5 vendas (amostra pequena).</p>
+          <p>
+            ** MRR = soma das mensalidades (com SVA) dos contratos não cancelados da campanha, vendas novas + migrações. Inclui
+            contratos ainda sem aceite ou aguardando instalação. Migração não é receita nova: o export não traz o valor anterior.
+          </p>
           {critical.length > 0 && (
             <p className="text-red-300/90">
               Risco alto (≥30%, com 5+ vendas): {critical.map((c) => `${c.key} (${c.novoCancelado + c.novoNaoAceito} de ${c.novo})`).join(', ')}.

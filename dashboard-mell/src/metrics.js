@@ -182,7 +182,7 @@ export const STATUS = {
 const FLAGS = ['cancelado', 'aguard_inst', 'aguard_mig', 'habilitado', 'aceito', 'nao_aceito', 'sem_contrato'];
 
 function emptyGeo(key) {
-  return { key, cidades: new Set(), novo: 0, migrado: 0, receitaNovo: 0, receitaMig: 0, novoFlags: {}, allFlags: {} };
+  return { key, cidades: new Set(), novo: 0, migrado: 0, receitaNovo: 0, receitaMig: 0, mrr: 0, novoFlags: {}, allFlags: {} };
 }
 
 function groupGeo(keyFn) {
@@ -192,6 +192,7 @@ function groupGeo(keyFn) {
     if (!map.has(k)) map.set(k, emptyGeo(k));
     const g = map.get(k);
     g.cidades.add(r.cidade);
+    g.mrr += r.mrr ?? 0;
     if (r.origem === 'novo') {
       g.novo += r.qtd;
       g.receitaNovo += r.receita;
@@ -214,6 +215,7 @@ function groupGeo(keyFn) {
         migrado: g.migrado,
         total,
         receita: g.receitaNovo + g.receitaMig,
+        mrr: g.mrr,
         ticketNovo: g.novo ? g.receitaNovo / g.novo : null,
         shareMeta: (g.novo / G.targetGoal) * 100,
         shareNovo: (g.novo / G.newSalesCount) * 100,
@@ -229,6 +231,7 @@ function groupGeo(keyFn) {
 }
 
 export const CITY_ROWS = groupGeo((c) => c);
+export const MRR_TOTAL = CITY_ROWS.reduce((s, c) => s + c.mrr, 0);
 
 // Risco específico das vendas novas (não da base toda).
 export const NEW_SALES_RISK = (() => {

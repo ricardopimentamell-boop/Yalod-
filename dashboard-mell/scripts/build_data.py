@@ -76,7 +76,8 @@ def main(path):
     rows = []
     for (cidade, origem), g in d.groupby(["cidade", "origem"]):
         r = {"cidade": cidade, "origem": origem, "qtd": len(g),
-             "receita": round(g.valor_c.sum(), 2), "receita_sem_sva": round(g.valor_s.sum(), 2)}
+             "receita": round(g.valor_c.sum(), 2), "receita_sem_sva": round(g.valor_s.sum(), 2),
+             "mrr": round(g.loc[~g.cancelado, "valor_c"].sum(), 2)}
         r.update({f: int(g[f].sum()) for f in flags})
         rows.append(r)
 
