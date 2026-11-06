@@ -8,8 +8,12 @@ Campanha 26/10 a 05/12/2026. Base: export Hubsoft (26/10 a 04/11/2026, 12h).
 ## Atualizar com um novo export
 
 ```
-scripts/update.sh relatorio-de-servicos-do-clien-AAAAMMDDHHMMSS.xlsx
+scripts/update.sh relatorio-de-servicos-do-clien-AAAAMMDDHHMMSS.xlsx [base_planos_anteriores.xlsx]
 ```
+
+O 2º arquivo (opcional) é a base de planos de antes da campanha, com as colunas
+`codigo_cliente` e `valor_atual...` (ou `valor_anterior...`). Com ela, cada migração é
+classificada como upgrade, downgrade ou igual; sem ela, fica "sem referência".
 
 Gera `src/export.json` (só agregados) e `dist/index.html`. A data/hora de corte sai do
 carimbo no nome do arquivo. O script para com erro se o export vier sem as colunas

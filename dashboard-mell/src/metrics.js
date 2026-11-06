@@ -178,60 +178,67 @@ export const STATUS = {
   semContrato: CONTRACT_ROWS.find((s) => s.name.startsWith('Sem Contrato')) ?? { count: 0, percentage: 0 },
 };
 
-// --- Cidades ---
-const FLAGS = ['cancelado', 'aguard_inst', 'aguard_mig', 'habilitado', 'aceito', 'nao_aceito', 'sem_contrato'];
+// --- Cidades (com filtro de dias) ---
+const FLAGS = ['cancelado', 'aguard_inst', 'aguard_mig', 'habilitado', 'aceito', 'nao_aceito', 'sem_contrato',
+  'upgrade', 'downgrade', 'igual', 'sem_ref'];
+const SUMS = ['qtd', 'receita', 'mrr', 'mrr_cancelado', 'delta_mrr', ...FLAGS];
 
-function emptyGeo(key) {
-  return { key, cidades: new Set(), novo: 0, migrado: 0, receitaNovo: 0, receitaMig: 0, mrr: 0, novoFlags: {}, allFlags: {} };
-}
+export const DAILY_GEO = EXPORT.por_dia_cidade_origem ?? EXPORT.por_cidade_origem.map((r) => ({ ...r, dia: 'sem-data' }));
+export const GEO_DAYS = [...new Set(DAILY_GEO.map((r) => r.dia))].filter((d) => d !== 'sem-data').sort();
+export const BASE_REF = EXPORT.base_referencia ?? { arquivo: null, clientes: 0, migracoes_com_referencia: 0 };
 
-function groupGeo(keyFn) {
+// Agrega linhas (dia, cidade, origem) em uma linha por cidade. `from`/`to` = 'AAAA-MM-DD' (inclusivo).
+export function aggregateCities(from = null, to = null) {
+  const inRange = (d) => (d === 'sem-data' ? !from && !to : (!from || d >= from) && (!to || d <= to));
   const map = new Map();
-  for (const r of EXPORT.por_cidade_origem) {
-    const k = keyFn(r.cidade);
-    if (!map.has(k)) map.set(k, emptyGeo(k));
-    const g = map.get(k);
-    g.cidades.add(r.cidade);
-    g.mrr += r.mrr ?? 0;
-    if (r.origem === 'novo') {
-      g.novo += r.qtd;
-      g.receitaNovo += r.receita;
-    } else {
-      g.migrado += r.qtd;
-      g.receitaMig += r.receita;
-    }
-    for (const f of FLAGS) {
-      g.allFlags[f] = (g.allFlags[f] ?? 0) + r[f];
-      if (r.origem === 'novo') g.novoFlags[f] = (g.novoFlags[f] ?? 0) + r[f];
+  for (const r of DAILY_GEO) {
+    if (!inRange(r.dia)) continue;
+    if (!map.has(r.cidade)) map.set(r.cidade, { novo: {}, migrado: {}, todos: {} });
+    const g = map.get(r.cidade);
+    for (const k of SUMS) {
+      g[r.origem][k] = (g[r.origem][k] ?? 0) + (r[k] ?? 0);
+      g.todos[k] = (g.todos[k] ?? 0) + (r[k] ?? 0);
     }
   }
-  return [...map.values()]
-    .map((g) => {
-      const total = g.novo + g.migrado;
-      const nf = (f) => g.novoFlags[f] ?? 0;
+  return [...map.entries()]
+    .map(([key, g]) => {
+      const n = (k) => g.novo[k] ?? 0;
+      const m = (k) => g.migrado[k] ?? 0;
+      const t = (k) => g.todos[k] ?? 0;
+      const novo = n('qtd');
       return {
-        key: g.key,
-        novo: g.novo,
-        migrado: g.migrado,
-        total,
-        receita: g.receitaNovo + g.receitaMig,
-        mrr: g.mrr,
-        ticketNovo: g.novo ? g.receitaNovo / g.novo : null,
-        shareMeta: (g.novo / G.targetGoal) * 100,
-        shareNovo: (g.novo / G.newSalesCount) * 100,
-        novoCancelado: nf('cancelado'),
-        novoAguardInst: nf('aguard_inst'),
-        novoNaoAceito: nf('nao_aceito'),
-        novoRisco: g.novo ? ((nf('cancelado') + nf('nao_aceito')) / g.novo) * 100 : null,
-        cancelPct: total ? ((g.allFlags.cancelado ?? 0) / total) * 100 : 0,
-        naoAceitoPct: total ? ((g.allFlags.nao_aceito ?? 0) / total) * 100 : 0,
+        key,
+        novo,
+        migrado: m('qtd'),
+        total: t('qtd'),
+        receita: t('receita'),
+        mrr: t('mrr'),
+        mrrNovo: n('mrr'),
+        mrrMig: m('mrr'),
+        mrrCancelado: t('mrr_cancelado'),
+        cancelados: t('cancelado'),
+        upgrade: m('upgrade'),
+        downgrade: m('downgrade'),
+        igual: m('igual'),
+        semRef: m('sem_ref'),
+        deltaMrr: t('delta_mrr'),
+        ticketNovo: novo ? n('receita') / novo : null,
+        shareMeta: (novo / G.targetGoal) * 100,
+        shareNovo: (novo / G.newSalesCount) * 100,
+        novoCancelado: n('cancelado'),
+        novoAguardInst: n('aguard_inst'),
+        novoNaoAceito: n('nao_aceito'),
+        novoRisco: novo ? ((n('cancelado') + n('nao_aceito')) / novo) * 100 : null,
+        cancelPct: t('qtd') ? (t('cancelado') / t('qtd')) * 100 : 0,
+        naoAceitoPct: t('qtd') ? (t('nao_aceito') / t('qtd')) * 100 : 0,
       };
     })
-    .sort((a, b) => b.novo - a.novo || b.total - a.total);
+    .sort((a, b) => b.mrr - a.mrr || b.novo - a.novo);
 }
 
-export const CITY_ROWS = groupGeo((c) => c);
-export const MRR_TOTAL = CITY_ROWS.reduce((s, c) => s + c.mrr, 0);
+export const sumRows = (rows, k) => rows.reduce((s, r) => s + (r[k] ?? 0), 0);
+export const CITY_ROWS = aggregateCities();
+export const MRR_TOTAL = sumRows(CITY_ROWS, 'mrr');
 
 // Risco específico das vendas novas (não da base toda).
 export const NEW_SALES_RISK = (() => {

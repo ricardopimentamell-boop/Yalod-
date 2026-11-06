@@ -37,6 +37,27 @@ def num(s):
     return pd.to_numeric(s.str.replace(".", "", regex=False).str.replace(",", "."), errors="coerce").fillna(0)
 
 
+def load_reference(path):
+    """Base de planos antes da campanha: codigo_cliente -> valor mensal anterior.
+
+    Aceita .xlsx/.csv com uma coluna codigo_cliente e uma coluna de valor cujo nome
+    começa com "valor_atual" ou "valor_anterior" (procura em todas as abas).
+    """
+    if not path:
+        return None
+    sheets = pd.read_excel(path, sheet_name=None) if str(path).endswith("xlsx") else {"csv": pd.read_csv(path)}
+    for df in sheets.values():
+        cols = {c.lower(): c for c in df.columns.astype(str)}
+        val = next((cols[c] for c in cols if c.startswith(("valor_atual", "valor_anterior"))), None)
+        if "codigo_cliente" in cols and val:
+            v = df[val]
+            if v.dtype == object:
+                v = pd.to_numeric(v.astype(str).str.replace(".", "", regex=False).str.replace(",", "."), errors="coerce")
+            ref = pd.Series(v.values, index=df[cols["codigo_cliente"]].astype(str).str.strip())
+            return ref[~ref.index.duplicated()].dropna()
+    fail(f"base de referência sem colunas codigo_cliente/valor_atual: {path}")
+
+
 def cutoff_from(path, cadastro):
     """Data/hora do corte: carimbo no nome do arquivo (…20261104120724…) ou último cadastro."""
     m = re.search(r"(20\d{12})", Path(path).name)
@@ -45,7 +66,7 @@ def cutoff_from(path, cadastro):
     return cadastro.max().to_pydatetime()
 
 
-def main(path):
+def main(path, base_path=None):
     raw = pd.read_excel(path, dtype=str)
     missing = [c for c in REQUIRED if c not in raw.columns]
     if missing:
@@ -73,13 +94,30 @@ def main(path):
     cutoff = cutoff_from(path, cad)
     flags = ["cancelado", "aguard_inst", "aguard_mig", "habilitado", "aceito", "nao_aceito", "sem_contrato"]
 
-    rows = []
-    for (cidade, origem), g in d.groupby(["cidade", "origem"]):
-        r = {"cidade": cidade, "origem": origem, "qtd": len(g),
-             "receita": round(g.valor_c.sum(), 2), "receita_sem_sva": round(g.valor_s.sum(), 2),
-             "mrr": round(g.loc[~g.cancelado, "valor_c"].sum(), 2)}
+    # Migração: upgrade/downgrade comparando com o valor do plano antes da campanha.
+    ref = load_reference(base_path)
+    d["valor_ant"] = d.codigo_cliente.astype(str).str.strip().map(ref) if ref is not None else float("nan")
+    is_mig = d.origem.eq("migrado")
+    diff = d.valor_c - d.valor_ant
+    d["upgrade"] = is_mig & (diff > 0.5)
+    d["downgrade"] = is_mig & (diff < -0.5)
+    d["igual"] = is_mig & diff.abs().le(0.5)
+    d["sem_ref"] = is_mig & d.valor_ant.isna()
+    d["delta_mrr"] = (diff.where(is_mig & d.valor_ant.notna() & ~d.cancelado)).fillna(0)
+    flags += ["upgrade", "downgrade", "igual", "sem_ref"]
+
+    def agg(g):
+        r = {"qtd": len(g), "receita": round(g.valor_c.sum(), 2), "receita_sem_sva": round(g.valor_s.sum(), 2),
+             "mrr": round(g.loc[~g.cancelado, "valor_c"].sum(), 2),
+             "mrr_cancelado": round(g.loc[g.cancelado, "valor_c"].sum(), 2),
+             "delta_mrr": round(g.delta_mrr.sum(), 2)}
         r.update({f: int(g[f].sum()) for f in flags})
-        rows.append(r)
+        return r
+
+    rows = [{"cidade": c, "origem": o, **agg(g)} for (c, o), g in d.groupby(["cidade", "origem"])]
+    d["dia_k"] = d.dia.fillna("sem-data")
+    daily_rows = [{"dia": k, "cidade": c, "origem": o, **agg(g)}
+                  for (k, c, o), g in d.groupby(["dia_k", "cidade", "origem"])]
 
     def totals(g):
         return {"qtd": len(g), "receita": round(g.valor_c.sum(), 2), "receita_sem_sva": round(g.valor_s.sum(), 2)}
@@ -112,6 +150,10 @@ def main(path):
             "Sem Contrato": int(d.sem_contrato.sum()),
         },
         "por_cidade_origem": rows,
+        "por_dia_cidade_origem": daily_rows,
+        "base_referencia": {"arquivo": Path(base_path).name if base_path else None,
+                            "clientes": 0 if ref is None else len(ref),
+                            "migracoes_com_referencia": int((is_mig & d.valor_ant.notna()).sum())},
         "vendas_novas_por_dia": [{"date": k, "qtd": int(v)} for k, v in daily.items()],
     }
 
@@ -128,6 +170,6 @@ def main(path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        fail("uso: python3 scripts/build_data.py relatorio.xlsx")
-    main(sys.argv[1])
+    if len(sys.argv) not in (2, 3):
+        fail("uso: python3 scripts/build_data.py relatorio.xlsx [base_planos_anteriores.xlsx]")
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) == 3 else None)
