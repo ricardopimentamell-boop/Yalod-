@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { MapPin, CalendarRange } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
-import { GENERAL_STATS } from './data.js';
+import { GENERAL_STATS, PERIODS } from './data.js';
 import { aggregateCities, sumRows, GEO_DAYS, BASE_REF } from './metrics.js';
 
 const fmt = (v, d = 0) =>
@@ -30,6 +30,11 @@ const PRESETS = [
   { id: 'all', label: 'Campanha toda', range: () => [first, last] },
   { id: 'last', label: 'Último dia', range: () => [last, last] },
   { id: 'week', label: 'Últimos 7 dias', range: () => [GEO_DAYS[Math.max(GEO_DAYS.length - 6, 0)], last] },
+  // Fases da campanha, limitadas aos dias que existem no export.
+  ...PERIODS.map((p) => {
+    const days = GEO_DAYS.filter((d) => d >= p.start && d <= p.end);
+    return days.length ? { id: p.id, label: p.label, range: () => [days[0], days[days.length - 1]] } : null;
+  }).filter(Boolean),
 ];
 
 function Card({ title, value, sub, tone = 'text-white' }) {

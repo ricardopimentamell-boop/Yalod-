@@ -59,6 +59,7 @@ import {
   SPLIT_PROJECTION,
   NEW_SALES_RISK,
 } from './metrics.js';
+import PeriodGoals from './PeriodGoals.jsx';
 
 const formatBRL = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 const formatNum = (val, digits = 0) =>
@@ -465,6 +466,7 @@ export default function App() {
         {/* TAB 2 - PROJECTION */}
         {activeTab === 'projection' && (
           <div className="space-y-6">
+            <PeriodGoals />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
                 <p className="text-xs font-semibold text-slate-400 uppercase">

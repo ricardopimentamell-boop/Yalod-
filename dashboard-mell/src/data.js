@@ -20,6 +20,12 @@ const cutHour = Number(CUT.slice(11, 13)) + Number(CUT.slice(14, 16)) / 60;
 export const CAMPAIGN_START = '2026-10-26';
 export const CAMPAIGN_END = '2026-12-05';
 export const HOLIDAYS = ['2026-11-02', '2026-11-15', '2026-11-20'];
+// Fases da campanha (meta global continua sendo TARGET_GOAL no período todo).
+// 26/11 fica na Fase 1; a Fase 2 começa em 27/11 (Black Friday).
+export const PERIODS = [
+  { id: 'f1', label: 'Fase 1', start: '2026-10-26', end: '2026-11-26' },
+  { id: 'f2', label: 'Fase 2 (Black Friday)', start: '2026-11-27', end: '2026-12-05' },
+];
 // Corte do export: dia e fração do dia comercial já decorrida.
 export const CUTOFF_DATE = CUT.slice(0, 10);
 export const CUTOFF_FRACTION = Math.min(

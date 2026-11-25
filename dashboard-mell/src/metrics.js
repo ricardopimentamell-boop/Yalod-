@@ -11,6 +11,7 @@ import {
   SERVICE_STATUS,
   CONTRACT_STATUS,
   MIGRATION_PRICES,
+  PERIODS,
 } from './data.js';
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -247,4 +248,103 @@ export const NEW_SALES_RISK = (() => {
     { canc: 0, nao: 0, inst: 0 },
   );
   return { ...t, cancPct: (t.canc / G.newSalesCount) * 100, naoPct: (t.nao / G.newSalesCount) * 100 };
+})();
+
+// --- Fases: meta proporcional, média e projeção validadas por período ---
+
+function splitDays(from, to) {
+  let weekdays = 0;
+  let saturdays = 0;
+  for (let d = parse(from); d <= parse(to); d.setDate(d.getDate() + 1)) {
+    if (!isBusinessDay(d)) continue;
+    if (d.getDay() === 6) saturdays += 1;
+    else weekdays += 1;
+  }
+  return { weekdays, saturdays, total: weekdays + saturdays };
+}
+
+const SCALE = G.currentConsultants / G.initialConsultants;
+
+export const PERIOD_ANALYSIS = (() => {
+  const rows = PERIODS.map((p) => {
+    const days = splitDays(p.start, p.end);
+    const goal = Math.round((G.targetGoal * days.total) / TOTAL_BUSINESS_DAYS);
+    const inP = (x) => x.date >= p.start && x.date <= p.end;
+    const realized = DAILY_ACTUALS.filter(inP).reduce((s, x) => s + x.qtd, 0);
+    const started = CUTOFF_DATE >= p.start;
+    const closed = CUTOFF_DATE > p.end || (CUTOFF_DATE === p.end && CUTOFF_FRACTION >= 1);
+
+    // Dias úteis decorridos dentro da fase (com fração do dia de corte).
+    let elapsed = 0;
+    if (started) {
+      const lastFull = CUTOFF_DATE > p.end ? p.end : CUTOFF_DATE;
+      elapsed = splitDays(p.start, lastFull).total;
+      if (lastFull === CUTOFF_DATE && CUTOFF_IS_BUSINESS) elapsed -= 1 - CUTOFF_FRACTION;
+    }
+
+    // Dias restantes na fase após o corte.
+    let remW = 0;
+    let remS = 0;
+    if (!closed) {
+      const from = started ? CUTOFF_DATE : p.start;
+      const r = splitDays(from, p.end);
+      remW = r.weekdays;
+      remS = r.saturdays;
+      if (started && CUTOFF_IS_BUSINESS) {
+        // do dia de corte só resta a fração não decorrida
+        if (isSaturday(CUTOFF_DATE)) remS -= CUTOFF_FRACTION;
+        else remW -= CUTOFF_FRACTION;
+      }
+    }
+
+    // Ritmo próprio da fase (com 3+ dias completos); senão, ritmo da campanha.
+    const full = fullDays.filter(inP);
+    const ownW = full.filter((x) => !isSaturday(x.date));
+    const ownS = full.filter((x) => isSaturday(x.date));
+    const ownPace = full.length >= 3;
+    const wPace = ownPace && ownW.length ? avg(ownW.map((x) => x.qtd)) : WEEKDAY_PACE;
+    const sPace = ownPace && ownS.length ? avg(ownS.map((x) => x.qtd)) : SATURDAY_PACE;
+
+    const future = (remW * wPace + remS * sPace) * SCALE;
+    const projection = Math.round(realized + future);
+    const remaining = remW + remS;
+    return {
+      ...p,
+      days,
+      goal,
+      realized,
+      elapsed,
+      avgDaily: elapsed > 0 ? realized / elapsed : null,
+      remainingDays: remaining,
+      paceSource: ownPace ? 'próprio da fase' : 'média da campanha',
+      wPace,
+      sPace,
+      projection,
+      diff: projection - goal,
+      rate: (projection / goal) * 100,
+      required: remaining > 0 ? Math.max(goal - realized, 0) / remaining : null,
+      status: closed ? 'encerrada' : started ? 'em andamento' : 'não iniciada',
+    };
+  });
+
+  const totalProj = rows.reduce((s, r) => s + r.projection, 0);
+  const remainingAll = rows.reduce((s, r) => s + r.remainingDays, 0);
+  const global = {
+    id: 'all',
+    label: 'Campanha (meta global)',
+    start: CAMPAIGN_START,
+    end: CAMPAIGN_END,
+    days: splitDays(CAMPAIGN_START, CAMPAIGN_END),
+    goal: G.targetGoal,
+    realized: G.newSalesCount,
+    elapsed: DAYS_ELAPSED,
+    avgDaily: G.newSalesCount / DAYS_ELAPSED,
+    remainingDays: remainingAll,
+    projection: totalProj,
+    diff: totalProj - G.targetGoal,
+    rate: (totalProj / G.targetGoal) * 100,
+    required: remainingAll > 0 ? Math.max(G.targetGoal - G.newSalesCount, 0) / remainingAll : null,
+    status: 'soma das fases',
+  };
+  return { rows, global };
 })();
