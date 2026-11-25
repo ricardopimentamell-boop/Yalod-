@@ -58,6 +58,7 @@ import {
   REMAINING_SPLIT,
   SPLIT_PROJECTION,
   NEW_SALES_RISK,
+  PER_CONSULTANT,
 } from './metrics.js';
 import PeriodGoals from './PeriodGoals.jsx';
 
@@ -470,39 +471,54 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
                 <p className="text-xs font-semibold text-slate-400 uppercase">
-                  Ritmo Atual Realizado ({GENERAL_STATS.initialConsultants} Consultores)
+                  Realizado por Consultor ({GENERAL_STATS.initialConsultants} Consultores)
                 </p>
                 <div className="mt-2 flex items-baseline space-x-2">
-                  <span className="text-3xl font-extrabold text-white">{formatNum(CURRENT_TEAM_PACE, 1)}</span>
-                  <span className="text-xs text-slate-400">vendas novas / dia útil</span>
+                  <span className="text-3xl font-extrabold text-white">{formatNum(PER_CONSULTANT.realizedPer, 3)}</span>
+                  <span className="text-xs text-slate-400">vendas / consultor / dia</span>
                 </div>
                 <p className="text-xs text-emerald-400 mt-2 font-medium">
-                  Produtividade: {formatNum(PACE_PER_CONSULTANT, 3)} vendas/consultor/dia
+                  {GENERAL_STATS.newSalesCount} vendas ÷ {formatNum(DAYS_ELAPSED, 1)} dias úteis ÷ {GENERAL_STATS.initialConsultants} consultores
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Equipe: {formatNum(PER_CONSULTANT.realizedDaily, 1)} vendas/dia útil</p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <p className="text-xs font-semibold text-slate-400 uppercase">
+                  Meta por Consultor ({GENERAL_STATS.currentConsultants} Consultores)
+                </p>
+                <div className="mt-2 flex items-baseline space-x-2">
+                  <span className="text-3xl font-extrabold text-indigo-400">{formatNum(PER_CONSULTANT.goalPer, 3)}</span>
+                  <span className="text-xs text-slate-400">vendas / consultor / dia</span>
+                </div>
+                <p className="text-xs text-indigo-300 mt-2 font-medium">
+                  {goal} vendas ÷ {PER_CONSULTANT.actionDays} dias úteis da ação ÷ {GENERAL_STATS.currentConsultants} consultores
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Equipe: {formatNum(PER_CONSULTANT.goalDaily, 1)} vendas/dia útil · Saldo: faltam {PER_CONSULTANT.missing} em{' '}
+                  {formatNum(PER_CONSULTANT.remainingDays, 1)} dias = {formatNum(PER_CONSULTANT.remainingPer, 3)}/consultor/dia
                 </p>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
                 <p className="text-xs font-semibold text-slate-400 uppercase">
-                  Ritmo Necessário para a Meta ({GENERAL_STATS.currentConsultants} Consultores)
+                  Projeção por Consultor ({CAMPAIGN_END.slice(8, 10)}/{CAMPAIGN_END.slice(5, 7)})
                 </p>
                 <div className="mt-2 flex items-baseline space-x-2">
-                  <span className="text-3xl font-extrabold text-indigo-400">{formatNum(BASE.requiredTeamDaily, 1)}</span>
-                  <span className="text-xs text-slate-400">vendas novas / dia útil</span>
+                  <span className={`text-3xl font-extrabold ${PER_CONSULTANT.projDiff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {formatNum(PER_CONSULTANT.projPer, 3)}
+                  </span>
+                  <span className="text-xs text-slate-400">vendas / consultor / dia</span>
                 </div>
-                <p className="text-xs text-indigo-300 mt-2 font-medium">
-                  Exigência: {formatNum(BASE.requiredPerConsultant, 3)} vendas/consultor/dia
+                <p className="text-xs text-slate-300 mt-2 font-medium">
+                  {PER_CONSULTANT.projection} vendas projetadas ÷ {PER_CONSULTANT.actionDays} dias úteis ÷ {GENERAL_STATS.currentConsultants} consultores
                 </p>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <p className="text-xs font-semibold text-slate-400 uppercase">Projeção de Fechamento ({CAMPAIGN_END.slice(8, 10)}/{CAMPAIGN_END.slice(5, 7)})</p>
-                <div className="mt-2 flex items-baseline space-x-2">
-                  <span className={`text-3xl font-extrabold ${baseOk ? 'text-emerald-400' : 'text-red-400'}`}>{BASE.grossTotal}</span>
-                  <span className="text-xs text-slate-400">vendas novas esperadas</span>
-                </div>
-                <p className="text-xs text-slate-400 mt-2 font-medium">
-                  Meta: {goal} |{' '}
-                  <strong className={baseOk ? 'text-emerald-400' : 'text-red-400'}>{signed(BASE.diffVsTarget)} vendas de folga</strong>
+                <p className="text-xs text-slate-500 mt-1">
+                  {formatPct(PER_CONSULTANT.projRate)} da meta ·{' '}
+                  <strong className={PER_CONSULTANT.projDiff >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                    {signed(PER_CONSULTANT.projDiff)} vendas de folga
+                  </strong>{' '}
+                  (soma das fases)
                 </p>
               </div>
             </div>

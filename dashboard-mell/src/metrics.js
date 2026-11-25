@@ -348,3 +348,29 @@ export const PERIOD_ANALYSIS = (() => {
   };
   return { rows, global };
 })();
+
+// --- Produtividade por consultor: total ÷ dias úteis ÷ consultores ---
+export const PER_CONSULTANT = (() => {
+  const days = TOTAL_BUSINESS_DAYS;
+  const proj = PERIOD_ANALYSIS.global.projection;
+  return {
+    actionDays: days,
+    // Realizado: vendas ÷ dias úteis decorridos ÷ consultores do período.
+    realizedDaily: G.newSalesCount / DAYS_ELAPSED,
+    realizedPer: G.newSalesCount / DAYS_ELAPSED / G.initialConsultants,
+    // Meta: objetivo ÷ dias úteis da ação ÷ consultores atuais.
+    goalDaily: G.targetGoal / days,
+    goalPer: G.targetGoal / days / G.currentConsultants,
+    // Projeção (soma das fases) com o mesmo cálculo da meta.
+    projection: proj,
+    projDaily: proj / days,
+    projPer: proj / days / G.currentConsultants,
+    projDiff: proj - G.targetGoal,
+    projRate: (proj / G.targetGoal) * 100,
+    // Saldo: o que falta ÷ dias úteis restantes ÷ consultores atuais.
+    missing: Math.max(G.targetGoal - G.newSalesCount, 0),
+    remainingDays: REMAINING_DAYS,
+    remainingDaily: BASE.requiredTeamDaily,
+    remainingPer: BASE.requiredPerConsultant,
+  };
+})();
