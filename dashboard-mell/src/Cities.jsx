@@ -30,11 +30,17 @@ const PRESETS = [
   { id: 'all', label: 'Campanha toda', range: () => [first, last] },
   { id: 'last', label: 'Último dia', range: () => [last, last] },
   { id: 'week', label: 'Últimos 7 dias', range: () => [GEO_DAYS[Math.max(GEO_DAYS.length - 6, 0)], last] },
-  // Fases da campanha, limitadas aos dias que existem no export.
+  // Fases da campanha: sempre visíveis; limitadas aos dias que existem no export.
   ...PERIODS.map((p) => {
     const days = GEO_DAYS.filter((d) => d >= p.start && d <= p.end);
-    return days.length ? { id: p.id, label: p.label, range: () => [days[0], days[days.length - 1]] } : null;
-  }).filter(Boolean),
+    const dm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+    return {
+      id: p.id,
+      label: `${p.label} · ${dm(p.start)}–${dm(p.end)}`,
+      empty: !days.length,
+      range: () => (days.length ? [days[0], days[days.length - 1]] : [null, null]),
+    };
+  }),
 ];
 
 function Card({ title, value, sub, tone = 'text-white' }) {
@@ -150,19 +156,26 @@ export default function Cities() {
         <div className="flex flex-wrap items-center gap-2">
           {PRESETS.map((p) => {
             const [a, b] = p.range();
-            const active = from === a && to === b;
+            const active = !p.empty && from === a && to === b;
             return (
               <button
                 key={p.id}
+                disabled={p.empty}
+                title={p.empty ? 'Sem vendas no export até o corte atual' : undefined}
                 onClick={() => {
                   setFrom(a);
                   setTo(b);
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-                  active ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                  p.empty
+                    ? 'border-dashed border-slate-700 text-slate-500 cursor-not-allowed'
+                    : active
+                      ? 'bg-indigo-600 border-indigo-500 text-white'
+                      : 'border-slate-700 text-slate-300 hover:bg-slate-800'
                 }`}
               >
                 {p.label}
+                {p.empty && ' (sem dados ainda)'}
               </button>
             );
           })}

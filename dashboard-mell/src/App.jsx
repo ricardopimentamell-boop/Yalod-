@@ -306,6 +306,7 @@ export default function App() {
         {/* TAB 1 - OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            <PeriodGoals />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
