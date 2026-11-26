@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { MapPin, CalendarRange } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
-import { GENERAL_STATS, PERIODS } from './data.js';
-import { aggregateCities, sumRows, GEO_DAYS, BASE_REF } from './metrics.js';
+import { GENERAL_STATS, PERIODS, CAMPAIGN_END } from './data.js';
+import { aggregateCities, sumRows, GEO_DAYS, BASE_REF, analyzeRange } from './metrics.js';
 
 const fmt = (v, d = 0) =>
   v == null ? '—' : new Intl.NumberFormat('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
@@ -26,11 +26,21 @@ const riskClass = (v, n) => {
 
 const first = GEO_DAYS[0];
 const last = GEO_DAYS[GEO_DAYS.length - 1];
+// Calendário completo da campanha (inclui dias futuros, para filtrar a Fase 2 antes de ter dados).
+const CAL_DAYS = (() => {
+  const out = [];
+  const end = CAMPAIGN_END > last ? CAMPAIGN_END : last;
+  for (let d = new Date(`${first}T12:00:00`); d <= new Date(`${end}T12:00:00`); d.setDate(d.getDate() + 1)) {
+    const iso = d.toISOString().slice(0, 10);
+    if (d.getDay() !== 0 || GEO_DAYS.includes(iso)) out.push(iso);
+  }
+  return out;
+})();
 const PRESETS = [
   { id: 'all', label: 'Campanha toda', range: () => [first, last] },
   { id: 'last', label: 'Último dia', range: () => [last, last] },
   { id: 'week', label: 'Últimos 7 dias', range: () => [GEO_DAYS[Math.max(GEO_DAYS.length - 6, 0)], last] },
-  // Fases da campanha: sempre visíveis; limitadas aos dias que existem no export.
+  // Fases da campanha: período completo da fase (dias sem vendas ainda aparecem zerados).
   ...PERIODS.map((p) => {
     const days = GEO_DAYS.filter((d) => d >= p.start && d <= p.end);
     const dm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
@@ -38,7 +48,7 @@ const PRESETS = [
       id: p.id,
       label: `${p.label} · ${dm(p.start)}–${dm(p.end)}`,
       empty: !days.length,
-      range: () => (days.length ? [days[0], days[days.length - 1]] : [null, null]),
+      range: () => [p.start < first ? first : p.start, p.end],
     };
   }),
 ];
@@ -136,6 +146,7 @@ export default function Cities() {
   const comRef = t('upgrade') + t('downgrade') + t('igual');
   const top = rows.filter((c) => c.total > 0).slice(0, 12);
   const critical = rows.filter((c) => c.novo >= 5 && c.novoRisco >= 30);
+  const goalRange = useMemo(() => analyzeRange({ id: 'sel', start: from, end: to }), [from, to]);
   const periodLabel = from === to ? dayLabel(from) : `${dayLabel(from)} a ${dayLabel(to)}`;
 
   const pick = (setter, other, isFrom) => (e) => {
@@ -156,21 +167,20 @@ export default function Cities() {
         <div className="flex flex-wrap items-center gap-2">
           {PRESETS.map((p) => {
             const [a, b] = p.range();
-            const active = !p.empty && from === a && to === b;
+            const active = from === a && to === b;
             return (
               <button
                 key={p.id}
-                disabled={p.empty}
                 title={p.empty ? 'Sem vendas no export até o corte atual' : undefined}
                 onClick={() => {
                   setFrom(a);
                   setTo(b);
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-                  p.empty
-                    ? 'border-dashed border-slate-700 text-slate-500 cursor-not-allowed'
-                    : active
-                      ? 'bg-indigo-600 border-indigo-500 text-white'
+                  active
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : p.empty
+                      ? 'border-dashed border-slate-600 text-slate-400 hover:bg-slate-800'
                       : 'border-slate-700 text-slate-300 hover:bg-slate-800'
                 }`}
               >
@@ -184,16 +194,16 @@ export default function Cities() {
           <label className="flex items-center gap-1.5">
             De
             <select value={from} onChange={pick(setFrom, to, true)} className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1.5 text-slate-100">
-              {GEO_DAYS.map((d) => (
-                <option key={d} value={d}>{dayLabel(d)}</option>
+              {CAL_DAYS.map((d) => (
+                <option key={d} value={d}>{dayLabel(d)}{d > last ? ' · sem dados' : ''}</option>
               ))}
             </select>
           </label>
           <label className="flex items-center gap-1.5">
             Até
             <select value={to} onChange={pick(setTo, from, false)} className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1.5 text-slate-100">
-              {GEO_DAYS.map((d) => (
-                <option key={d} value={d}>{dayLabel(d)}</option>
+              {CAL_DAYS.map((d) => (
+                <option key={d} value={d}>{dayLabel(d)}{d > last ? ' · sem dados' : ''}</option>
               ))}
             </select>
           </label>
@@ -212,7 +222,11 @@ export default function Cities() {
           title="Vendas novas"
           value={fmt(t('novo'))}
           tone="text-emerald-400"
-          sub={`${pct((t('novo') / GENERAL_STATS.targetGoal) * 100)} da meta ${GENERAL_STATS.targetGoal}`}
+          sub={
+            isAll
+              ? `${pct((t('novo') / GENERAL_STATS.targetGoal) * 100)} da meta ${GENERAL_STATS.targetGoal}`
+              : `${goalRange.goal ? pct((t('novo') / goalRange.goalExact) * 100) : '—'} da meta proporcional ${fmt(goalRange.goalExact, 1)} (${goalRange.days.total} dias úteis)`
+          }
         />
         <Card
           title="Migrações"

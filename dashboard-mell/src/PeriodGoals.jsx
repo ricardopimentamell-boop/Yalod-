@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { CalendarRange } from 'lucide-react';
-import { PERIOD_ANALYSIS } from './metrics.js';
-import { GENERAL_STATS } from './data.js';
+import { PERIOD_ANALYSIS, analyzeRange } from './metrics.js';
+import { GENERAL_STATS, CAMPAIGN_START, CAMPAIGN_END } from './data.js';
 
 const fmt = (v, d = 0) =>
   v == null ? '—' : new Intl.NumberFormat('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
@@ -23,8 +23,22 @@ function Stat({ label, value, sub, tone = 'text-white' }) {
 
 export default function PeriodGoals() {
   const [sel, setSel] = useState('all');
-  const p = OPTIONS.find((o) => o.id === sel);
+  const [cFrom, setCFrom] = useState(rows[0].start);
+  const [cTo, setCTo] = useState(rows[rows.length - 1].end);
+  const custom = useMemo(
+    () => ({ ...analyzeRange({ id: 'custom', label: 'Personalizado', start: cFrom, end: cTo }) }),
+    [cFrom, cTo],
+  );
+  const p = sel === 'custom' ? custom : OPTIONS.find((o) => o.id === sel);
   const ok = p.diff >= 0;
+  const pickDate = (setter, isFrom) => (e) => {
+    const v = e.target.value;
+    if (!v || v < CAMPAIGN_START || v > CAMPAIGN_END) return;
+    setter(v);
+    if (isFrom && v > cTo) setCTo(v);
+    if (!isFrom && v < cFrom) setCFrom(v);
+    setSel('custom');
+  };
   const td = 'px-3 py-2 whitespace-nowrap';
 
   return (
@@ -54,16 +68,56 @@ export default function PeriodGoals() {
               {o.id === 'all' ? 'Campanha toda' : o.label} · {dm(o.start)}–{dm(o.end)}
             </button>
           ))}
+          <button
+            onClick={() => setSel('custom')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium border ${
+              sel === 'custom'
+                ? 'bg-indigo-600 border-indigo-500 text-white'
+                : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            Personalizado
+          </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2">
+        <span className="font-semibold text-slate-300">Período livre:</span>
+        <label className="flex items-center gap-1.5">
+          De
+          <input
+            type="date"
+            value={cFrom}
+            min={CAMPAIGN_START}
+            max={CAMPAIGN_END}
+            onChange={pickDate(setCFrom, true)}
+            className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-slate-100 [color-scheme:dark]"
+          />
+        </label>
+        <label className="flex items-center gap-1.5">
+          Até
+          <input
+            type="date"
+            value={cTo}
+            min={CAMPAIGN_START}
+            max={CAMPAIGN_END}
+            onChange={pickDate(setCTo, false)}
+            className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-slate-100 [color-scheme:dark]"
+          />
+        </label>
+        <span>
+          Meta proporcional = {GENERAL_STATS.targetGoal} × {custom.days.total} dias úteis ÷ {global.days.total} ={' '}
+          <b className="text-slate-200">{fmt(custom.goalExact, 1)}</b>
+        </span>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <Stat
-          label={p.id === 'all' ? 'Meta global' : 'Meta proporcional'}
+          label={p.id === 'all' ? 'Meta global' : 'Meta proporcional do período'}
           value={fmt(p.goal)}
           sub={`${p.days.total} dias úteis (${p.days.weekdays} seg-sex + ${p.days.saturdays} sáb)`}
         />
-        <Stat label="Realizado" value={fmt(p.realized)} sub={`${fmt((p.realized / p.goal) * 100, 1)}% da meta · ${p.status}`} tone="text-emerald-400" />
+        <Stat label="Realizado" value={fmt(p.realized)} sub={`${p.goal ? fmt((p.realized / p.goal) * 100, 1) : '—'}% da meta · ${p.status}`} tone="text-emerald-400" />
         <Stat label="Média realizada" value={fmt(p.avgDaily, 1)} sub={`vendas/dia útil em ${fmt(p.elapsed, 1)} dias`} tone="text-sky-300" />
         <Stat
           label="Necessário"
@@ -74,7 +128,7 @@ export default function PeriodGoals() {
         <Stat
           label="Projeção"
           value={fmt(p.projection)}
-          sub={`${signed(p.diff)} vs meta (${fmt(p.rate, 1)}%)`}
+          sub={`${signed(p.diff)} vs meta (${p.goal ? fmt(p.rate, 1) : '—'}%)`}
           tone={ok ? 'text-emerald-400' : 'text-red-400'}
         />
       </div>
@@ -113,6 +167,24 @@ export default function PeriodGoals() {
                 <td className={`${td} font-semibold ${r.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{signed(r.diff)}</td>
               </tr>
             ))}
+            {sel === 'custom' && (
+              <tr className="border-b border-slate-800/60 bg-indigo-950/30">
+                <td className={td}>
+                  <span className="font-medium text-indigo-200">Personalizado</span>
+                  <span className="text-xs text-slate-500"> {dm(custom.start)}–{dm(custom.end)} · {custom.status}</span>
+                </td>
+                <td className={td}>{custom.days.total}</td>
+                <td className={td}>{fmt(custom.goal)}</td>
+                <td className={td}>{fmt(custom.realized)}</td>
+                <td className={td}>{fmt(custom.avgDaily, 1)}</td>
+                <td className={td}>{fmt(custom.required, 1)}</td>
+                <td className={`${td} text-xs text-slate-400`}>
+                  {fmt(custom.wPace, 1)} seg-sex / {fmt(custom.sPace, 1)} sáb ({custom.paceSource})
+                </td>
+                <td className={td}>{fmt(custom.projection)}</td>
+                <td className={`${td} font-semibold ${custom.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{signed(custom.diff)}</td>
+              </tr>
+            )}
             <tr className="bg-slate-950/60 font-semibold">
               <td className={td}>Total (meta global)</td>
               <td className={td}>{global.days.total}</td>
@@ -129,8 +201,8 @@ export default function PeriodGoals() {
       </div>
 
       <p className="text-xs text-slate-500">
-        Meta da fase = {GENERAL_STATS.targetGoal} × (dias úteis da fase ÷ dias úteis da campanha). A projeção de cada fase usa o
-        ritmo seg-sex e de sábado da própria fase quando ela já tem 3+ dias completos; antes disso, usa a média da campanha. O ritmo
+        Meta da fase (ou do período livre) = {GENERAL_STATS.targetGoal} × (dias úteis do período ÷ dias úteis da campanha). A projeção usa o
+        ritmo seg-sex e de sábado do próprio período quando ele já tem 3+ dias completos; antes disso, usa a média da campanha. O ritmo
         é ajustado para {GENERAL_STATS.currentConsultants} consultores. A projeção global é a soma das fases, e a folga de uma fase
         compensa a da outra.
       </p>

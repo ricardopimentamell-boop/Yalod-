@@ -265,10 +265,13 @@ function splitDays(from, to) {
 
 const SCALE = G.currentConsultants / G.initialConsultants;
 
-export const PERIOD_ANALYSIS = (() => {
-  const rows = PERIODS.map((p) => {
+// Análise de qualquer intervalo de datas da campanha: meta proporcional aos dias úteis,
+// realizado, média, necessário e projeção (ritmo próprio com 3+ dias completos).
+export function analyzeRange(p) {
+  {
     const days = splitDays(p.start, p.end);
     const goal = Math.round((G.targetGoal * days.total) / TOTAL_BUSINESS_DAYS);
+    const goalExact = (G.targetGoal * days.total) / TOTAL_BUSINESS_DAYS;
     const inP = (x) => x.date >= p.start && x.date <= p.end;
     const realized = DAILY_ACTUALS.filter(inP).reduce((s, x) => s + x.qtd, 0);
     const started = CUTOFF_DATE >= p.start;
@@ -312,11 +315,12 @@ export const PERIOD_ANALYSIS = (() => {
       ...p,
       days,
       goal,
+      goalExact,
       realized,
       elapsed,
       avgDaily: elapsed > 0 ? realized / elapsed : null,
       remainingDays: remaining,
-      paceSource: ownPace ? 'próprio da fase' : 'média da campanha',
+      paceSource: ownPace ? 'próprio do período' : 'média da campanha',
       wPace,
       sPace,
       projection,
@@ -325,7 +329,11 @@ export const PERIOD_ANALYSIS = (() => {
       required: remaining > 0 ? Math.max(goal - realized, 0) / remaining : null,
       status: closed ? 'encerrada' : started ? 'em andamento' : 'não iniciada',
     };
-  });
+  }
+}
+
+export const PERIOD_ANALYSIS = (() => {
+  const rows = PERIODS.map(analyzeRange);
 
   const totalProj = rows.reduce((s, r) => s + r.projection, 0);
   const remainingAll = rows.reduce((s, r) => s + r.remainingDays, 0);
